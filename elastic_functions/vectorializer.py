@@ -168,7 +168,7 @@ def patches_index_to_elastic(jsonl_file, INDEX_NAME):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3 <-d|-p> vectorializer.py <path_to_jsonl> <reset (optional)> \n  -d for documentation input, -p for patches")
+        print("Usage: python3 <-d|-p> vectorializer.py <path_to_file> <reset (optional)> \n  -d for documentation input, -p for patches")
         sys.exit(1)
     
     input_type = sys.argv[1]

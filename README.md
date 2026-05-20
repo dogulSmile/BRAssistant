@@ -1,19 +1,31 @@
-# Platform Engine (Elasticsearch & LLM Processing Pipeline)
+# Buildroot Review Assistant
 
-This repository contains the backend processing and indexing pipeline for log analysis and document processing. The system leverages Elasticsearch for storage and search capability, combined with a Python-based asynchronous pipeline utilizing NLP tools (`sentence-transformers`) and LLM orchestration (`openrouter`).
+An AI-powered automated code review assistant designed specifically for the **Buildroot** project. The system leverages Retrieval-Augmented Generation (RAG) by combining an **Elasticsearch** vector database with an AI agent (here **Gemini 3 Flash (Thinking Mode)**) to analyze patches, enforce manual compliance, cross-reference historical rejections (jurisprudence), and handle complex multi-part patch series.
+
+---
+
+## Key Features
+
+* **Dual-Engine RAG**: Performs semantic kNN vector searches over both the official Buildroot User Manual and a curated history of past patch rejections.
+* **Code-Signature Alignment**: Employs a unified embedding strategy to match raw patch diff patterns directly with natural language developer logs.
+* **Patchwork Series Awareness**: Automatically detects patch structures (e.g., `[v5, 2/5]`), securely querying the Patchwork API to pull and reconstruct the context of the series' Cover Letter ($0/n$) and previous patches before reviewing the target file.
+* **Strict Hierarchy of Truth**: Validates submissions through an ordered priority loop: Manual Rules $\\rightarrow$ Past Case-Law $\\rightarrow$ Expert Intuition.
+* **Production-Ready Output**: Generates editable standard `.eml` mail draft reviews containing precise, inline file feedback.
+
+---
 
 ## Prerequisites
 
-Ensure your host machine has the following installed:
-* Python 3.10 or higher
-* Docker & Docker Compose
-* `curl` (for verification)
+Ensure your host machine has the following prerequisites installed:
+* **Python 3.10** or higher
+* **Docker** & Docker Engine
+* `curl` (for database verification)
 
 ---
 
 ## Infrastructure Setup
 
-The pipeline requires an active Elasticsearch 8.x instance. You can run it either locally via systemd or containerized via Docker.
+The processing pipeline requires an active Elasticsearch 8.x instance to store embeddings.
 
 ### Option A: Docker Deployment (Recommended)
 
@@ -54,8 +66,8 @@ curl -s "http://localhost:9200/_cat/indices?v&h=index,docs.count,pri.store.size,
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
-   cd <repository-folder>
+   git clone https://github.com/dogulSmile/BRAssistant
+   cd BRAssistant
    ```
 
 2. **Create and activate a virtual environment:**
@@ -75,6 +87,16 @@ curl -s "http://localhost:9200/_cat/indices?v&h=index,docs.count,pri.store.size,
    ```env
    GEMINI_API_KEY="your_key_here"
    HF_TOKEN="your_key_here"
+   ```
+
+4. **Environment Variables:**
+
+   Launch those 2 commands at the root of the project to initialize the database (Elasticsearch must be started):
+   ```bash
+   python3 -d vectorializer.py ressources/The_Buildroot_user_manual.html reset
+   python3 -p vectorializer.py ressources/buildroot_lessons.jsonl reset
+
+   (You can enhance the database by adding other files, but the format has to be respected.)
    ```
 
 ---
