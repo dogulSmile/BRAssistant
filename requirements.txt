@@ -1,0 +1,9 @@
+elasticsearch<9.0.0
+sentence-transformers
+huggingface_hub
+bs4
+python-dotenv
+openrouter
+asyncio
+aiohttp
+tenacity
