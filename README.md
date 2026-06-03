@@ -32,12 +32,16 @@ The processing pipeline requires an active Elasticsearch 8.x instance to store e
 Run the following command to spin up a single-node Elasticsearch container with security features disabled for development purposes:
 
 ```bash
+docker pull docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+
 docker run -d --name elasticsearch \
   -p 9200:9200 \
   -e "discovery.type=single-node" \
   -e "xpack.security.enabled=false" \
-  -e "ES_JAVA_OPTS=-Xms512m -Xmx512m" \
+  -e "ES_JAVA_OPTS=-Xms2g -Xmx2g" \
   docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+
+docker start elasticsearch
 ```
 
 ### Option B: Host Systemd Service
@@ -57,7 +61,7 @@ sudo systemctl start elasticsearch
 Verify that the cluster is up and inspect available indices (including document counts and store sizes) using the following `curl` command:
 
 ```bash
-curl -s "http://localhost:9200/_cat/indices?v&h=index,docs.count,pri.store.size,store.size&s=index"
+curl -s "http://localhost:9200/"
 ```
 
 ---
@@ -83,7 +87,10 @@ curl -s "http://localhost:9200/_cat/indices?v&h=index,docs.count,pri.store.size,
    ```
 
 4. **Environment Variables:**
-   Create a `.env` file in the root directory to store your API keys and configuration configurations:
+   Get your keys here (no specific permissions required) :
+      https://aistudio.google.com/app/api-keys?project=gen-lang-client-0489474561
+      https://huggingface.co/settings/tokens
+   and create a `.env` file in the root directory to store your API keys and configuration configurations:
    ```env
    GEMINI_API_KEY="your_key_here"
    HF_TOKEN="your_key_here"
@@ -93,8 +100,8 @@ curl -s "http://localhost:9200/_cat/indices?v&h=index,docs.count,pri.store.size,
 
    Launch those 2 commands at the root of the project to initialize the database (Elasticsearch must be started):
    ```bash
-   python3 -d vectorializer.py ressources/The_Buildroot_user_manual.html reset
-   python3 -p vectorializer.py ressources/buildroot_lessons.jsonl reset
+   python3 elastic_functions/vectorializer.py -d ressources/The_Buildroot_user_manual.html reset
+   python3 elastic_functions/vectorializer.py -p ressources/buildroot_lessons.jsonl reset
 
    (You can enhance the database by adding other files, but the format has to be respected.)
    ```

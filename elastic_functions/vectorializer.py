@@ -1,5 +1,6 @@
 from elasticsearch import Elasticsearch, helpers
 from sentence_transformers import SentenceTransformer
+from huggingface_hub import login
 import json
 import sys
 import os
@@ -10,15 +11,23 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
 hf_token = os.getenv("HF_TOKEN", "")
+if hf_token:
+    login(token=hf_token, add_to_git_credential=False)
+    
 embedder = SentenceTransformer('all-MiniLM-L6-v2', token=hf_token)
 
 # 2. Setup Client (ES 8.x Official Pattern)
 es = Elasticsearch(
     "http://localhost:9200",
-    meta_header=False
+    meta_header=False,
+    request_timeout=180,
+    max_retries=3,
+    retry_on_timeout=True
 )
-es = es.options(headers={"Accept": "application/vnd.elasticsearch+json; compatible-with=8", 
-                         "Content-Type": "application/json"})
+es = es.options(headers={
+    "Accept": "application/vnd.elasticsearch+json; compatible-with=8", 
+    "Content-Type": "application/json"
+})
 
 PATCHES_INDEX_NAME = "buildroot-patches-history"
 DOCUMENTATION_INDEX_NAME = "buildroot-documentation"
@@ -121,7 +130,7 @@ def manual_index_to_elastic(html_path, INDEX_NAME, target_ids):
                 }
             })
 
-    helpers.bulk(es, actions)
+    helpers.bulk(es, actions, chunk_size=50, request_timeout=200)
     print(f"{len(actions)} sections of the manual indexed with full content.")
 
 def patches_index_to_elastic(jsonl_file, INDEX_NAME):
