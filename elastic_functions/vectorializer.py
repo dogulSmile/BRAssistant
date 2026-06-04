@@ -130,8 +130,12 @@ def manual_index_to_elastic(html_path, INDEX_NAME, target_ids):
                 }
             })
 
-    helpers.bulk(es, actions, chunk_size=50, request_timeout=200)
-    print(f"{len(actions)} sections of the manual indexed with full content.")
+    try:
+        helpers.bulk(es, actions, chunk_size=50, request_timeout=200)
+        print(f"{len(actions)} sections of the manual indexed with full content.")
+    except helpers.BulkIndexError as e:
+        print(f"Error during indexing of {len(e.errors)} documents : ")
+        print(json.dumps(e.errors[0], indent=2))
 
 def patches_index_to_elastic(jsonl_file, INDEX_NAME):
     actions = []

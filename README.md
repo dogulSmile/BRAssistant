@@ -63,7 +63,11 @@ Verify that the cluster is up and inspect available indices (including document 
 ```bash
 curl -s "http://localhost:9200/"
 ```
+Please also verify that your disk usage is below 85% or you might have indexation problems (see https://www.elastic.co/docs/troubleshoot/elasticsearch/fix-watermark-errors) :
 
+```bash
+curl -s "http://localhost:9200/_cat/allocation?v"
+```
 ---
 
 ## Installation & Setup
