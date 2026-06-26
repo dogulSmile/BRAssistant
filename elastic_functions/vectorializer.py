@@ -10,13 +10,12 @@ from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
 
-hf_token = os.getenv("HF_TOKEN", "")
+hf_token = os.getenv("HF_API_KEY", "")
 if hf_token:
     login(token=hf_token, add_to_git_credential=False)
     
 embedder = SentenceTransformer('all-MiniLM-L6-v2', token=hf_token)
 
-# 2. Setup Client (ES 8.x Official Pattern)
 es = Elasticsearch(
     "http://localhost:9200",
     meta_header=False,
@@ -29,23 +28,22 @@ es = es.options(headers={
     "Content-Type": "application/json"
 })
 
+MAPPING_FILE = "ressources/sections_buildroot_manual.json"
+try:
+    with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+        SECTIONS_MAPPING = json.load(f)
+except FileNotFoundError:
+    print(f"Error: {MAPPING_FILE} not found.")
+    sys.exit(1)
+    
 PATCHES_INDEX_NAME = "buildroot-patches-history"
 DOCUMENTATION_INDEX_NAME = "buildroot-documentation"
 
-TARGET_DOC_SECTIONS = [
-    "_the_formatting_of_a_patch", "_patch_revision_changelog", "patch-policy",
-    "_within_buildroot", "_format_and_licensing_of_the_package_patches", 
-    "additional-patch-documentation", "writing-rules-config-in", "writing-rules-mk",
-    "package-name-variable-relation", "generic-package-reference", "adding-packages-hash",
-    "depends-on-vs-select", "dependencies-target-toolchain-options", "_start_script_configuration",
-    "autotools-package-reference", "cmake-package-reference", "python-package-reference",
-    "virtual-package-tutorial", "_package_directory", "customize-dir-structure"
-]
-
 def create_manual_index(INDEX_NAME):
-    """Function 3: Initialize the index for manual rules."""
+    """Initialize the elasticsearch index for buildroot manual rules."""
     mappings = {
         "properties": {
+            "chapter_number": {"type": "keyword"},
             "section_id": {"type": "keyword"}, # The HTML anchor (e.g. writing-rules-mk)
             "chapter": {"type": "keyword"},    # Parent chapter title
             "rule_title": {"type": "text"},    # Specific rule name
@@ -62,6 +60,7 @@ def create_manual_index(INDEX_NAME):
     print(f"Index '{INDEX_NAME}' created.")
 
 def create_patches_index(INDEX_NAME):
+    """Initialize the elasticsearch index for precedent patch reviews."""
     # Official ES 8.x Mapping for kNN (HNSW index)
     # Ref: https://www.elastic.co/guide/en/elasticsearch/reference/current/knn-search.html
     mappings = {
@@ -96,32 +95,36 @@ def create_patches_index(INDEX_NAME):
         # If still 400, try to print the full response to see why
         print(f"Index creation failed: {e}")
 
-def manual_index_to_elastic(html_path, INDEX_NAME, target_ids):
+def manual_index_to_elastic(html_path, INDEX_NAME, SECTIONS_MAPPING):
+    """
+    Send the list of manual rules to the elastic database while vectorizing them.
+    """
     with open(html_path, 'r', encoding='utf-8') as f:
         soup = BeautifulSoup(f, 'html.parser')
 
     actions = []
-    for sid in target_ids:
+    for chapter_num, info in SECTIONS_MAPPING.items():
+        sid = info["section_id"]
         section_anchor = soup.find(id=sid)
-        if not section_anchor: continue
+        if not section_anchor: 
+            print(f"Warning: HTML ID '{sid}' for chapter {chapter_num} not found !")
+            continue
 
-        # Climb to the parent div with class "section", "chapter", or "appendix"
         container = section_anchor.find_parent("div", class_=["section", "chapter", "appendix"])
         
         if container:
-            # Retrieve the title (h2, h3, or h4)
             title_tag = container.find(['h2', 'h3', 'h4', 'h5'])
             title = title_tag.get_text(strip=True) if title_tag else sid
-            
-            # Clean the text: replace multiple line breaks with a single one
-            # to avoid visually empty "rules"
-            raw_text = container.get_text(separator=" ", strip=True)
-            clean_text = re.sub(r'\s+', ' ', raw_text)
+
+            raw_text = container.get_text(separator="\n", strip=True)
+            clean_text = re.sub(r'[ \t]+', ' ', raw_text)
+            clean_text = re.sub(r'\n\s*\n', '\n\n', clean_text)
 
             actions.append({
                 "_index": INDEX_NAME,
                 "_id": f"doc_{sid}",
                 "_source": {
+                    "chapter_number": chapter_num, 
                     "section_id": sid,
                     "rule_title": title,
                     "raw_content": clean_text,
@@ -131,13 +134,16 @@ def manual_index_to_elastic(html_path, INDEX_NAME, target_ids):
             })
 
     try:
-        helpers.bulk(es, actions, chunk_size=50, request_timeout=200)
+        helpers.bulk(es.options(request_timeout=200), actions, chunk_size=50)
         print(f"{len(actions)} sections of the manual indexed with full content.")
     except helpers.BulkIndexError as e:
         print(f"Error during indexing of {len(e.errors)} documents : ")
         print(json.dumps(e.errors[0], indent=2))
 
 def patches_index_to_elastic(jsonl_file, INDEX_NAME):
+    """
+    Send the list of patches to the elastic database while vectorizing them.
+    """
     actions = []
     with open(jsonl_file, 'r') as f:
         for i, line in enumerate(f):
@@ -151,10 +157,11 @@ def patches_index_to_elastic(jsonl_file, INDEX_NAME):
                 if isinstance(patterns, list):
                     patterns = " ".join(patterns)
 
+                #Data that will be used for vectorial search
+                commit_intent = data.get('commit_message', data.get('package', ''))
                 combined_text = (
-                    f"Package: {data.get('package', 'unknown')} "
-                    f"Issue: {data['technical_issue']} "
                     f"Code Error: {patterns} "
+                    f"Issue Context: {commit_intent}"
                 )
                 vector = embedder.encode(combined_text).tolist()
                 
@@ -163,6 +170,7 @@ def patches_index_to_elastic(jsonl_file, INDEX_NAME):
                     "_id": f"{data.get('patch_id', i)}", 
                     "_source": {
                         "package": data.get('package', 'unknown'),
+                        "commit_message": commit_intent,
                         "technical_issue": data['technical_issue'],
                         "corrective_action": data['corrective_action'],
                         "code_pattern": patterns,
@@ -197,7 +205,7 @@ if __name__ == "__main__":
 
     if input_type == '-d':
         if reset_asked.lower() == "reset": create_manual_index(DOCUMENTATION_INDEX_NAME)
-        manual_index_to_elastic(input_path, DOCUMENTATION_INDEX_NAME, TARGET_DOC_SECTIONS)
+        manual_index_to_elastic(input_path, DOCUMENTATION_INDEX_NAME, SECTIONS_MAPPING)
     else:
         if reset_asked.lower() == "reset": create_patches_index(PATCHES_INDEX_NAME)
         patches_index_to_elastic(input_path, PATCHES_INDEX_NAME)

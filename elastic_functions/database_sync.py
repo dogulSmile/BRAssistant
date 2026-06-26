@@ -14,9 +14,8 @@ def sync_knowledge(embedder, es, jsonl_path, index_name="buildroot-patches-histo
 
     print(f"Syncing knowledge from {jsonl_path}...")
     
-    # 1. Retrieve already indexed IDs to avoid unnecessary work
+    # Retrieve already indexed IDs to avoid unnecessary work
     try:
-        # Retrieve existing IDs through a simple query
         res = es.search(index=index_name, source=False, size=10000)
         indexed_ids = {hit["_id"] for hit in res["hits"]["hits"]}
     except Exception:

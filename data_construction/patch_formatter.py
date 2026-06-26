@@ -1,7 +1,6 @@
 import json
 from google import genai
 from google.genai import types
-from google.api_core import exceptions
 import google.genai.errors as errors
 import sys
 import os
@@ -73,11 +72,13 @@ def synthesize_lessons(input_file="", output_path=""):
             3. TECHNICAL ISSUE: Explain why it was rejected/changed. (use key: "technical_issue").
             4. CORRECTIVE ACTION: State the rule for the contributor to follow. (use key: "corrective_action").
 
-            Output must be a STRICT JSON object with lowercase keys.
+            Output must be a STRICT single JSON object (DO NOT return an array/list) with lowercase keys.
+            If the patch modifies multiple packages, summarize the general rule in a single object.
             """
 
             success = False
             for attempt in range(1, MAX_RETRIES + 1):
+                success = False
                 try:
                     response = client.models.generate_content(
                         model=MODEL_ID,
@@ -87,10 +88,13 @@ def synthesize_lessons(input_file="", output_path=""):
                         )
                     )
                     
-                    synthesis = json.loads(response.text)
+                    synthesis = json.loads(response.text,strict=False)
                     synthesis['patch_id'] = patch_id
                     synthesis['status'] = entry['status']
                     synthesis['date'] = entry['date']
+
+                    #Adds the original commit message to RAG retrieval
+                    synthesis['commit_message'] = entry.get('commit_message', entry.get('subject', ''))
 
                     f_out.write(json.dumps(synthesis) + "\n")
                     f_out.flush()
@@ -104,6 +108,11 @@ def synthesize_lessons(input_file="", output_path=""):
                     time.sleep(1) 
                     break 
                 
+                except json.JSONDecodeError as e:
+                    print(f"Error, Bad JSON on patch {patch_id} (Attempt {attempt}/{MAX_RETRIES}) : {e}")
+                    time.sleep(2) # On attend un peu et on relance la boucle
+                    continue
+
                 except errors.APIError as e:
                     if e.code == 429:
                         print(f"Quota exceeded (429). Attempt {attempt}/5. Sleeping 60s...")

@@ -1,7 +1,7 @@
+import os
 import requests
 import time
 import json
-import re
 import sys
 
 BASE_API = "https://patchwork.ozlabs.org/api/1.2"
@@ -20,9 +20,11 @@ state_dict = {
 invert_dict = {v: k for k, v in state_dict.items()}
 
 output_path = sys.argv[1]
+if (os.path.isdir(output_path)):
+    output_path = os.path.join(output_path, "patches.json")
 
 def clean_comment(text):
-    """Supprime les lignes de citations (>) et les signatures pour ne garder que le texte frais."""
+    """Delete quoting lines and signatures to keep it clean."""
     lines = text.split('\n')
     cleaned_lines = [l for l in lines if not l.strip().startswith('>') and len(l.strip()) > 0]
     return '\n'.join(cleaned_lines)
@@ -35,15 +37,17 @@ def get_deep_patch_data(patch_api_url):
     return res.json()
 
 def harvest_deep_lessons(max_pages=1, patch_status="*", output_file=""):
-    
-    if len(output_file) == 0:
-        output_file = "lessons_raw.json"
+    """
+    Retrieve patches with specific status from the patchwork website (when not down...)
+    """
+    if not (os.path.isfile(output_file)):
+        output_file = "output/lessons_raw.json"
 
     with open(output_file, "a+", encoding="utf-8") as f:
 
-        for page in range(11, max_pages + 1):
+        for page in range(20, max_pages + 1):
             list_url = f"{BASE_API}/patches/?project={PROJECT_ID}&state={patch_status}&per_page=10&page={page}&order=-date"
-            print(f"--- Analyse Page {page} ---")
+            print(f"--- Analyze Page {page}/{max_pages} ---")
             
             r = requests.get(list_url)
             if r.status_code != 200: break
@@ -52,17 +56,23 @@ def harvest_deep_lessons(max_pages=1, patch_status="*", output_file=""):
             
             for item in summary_list:
                 
-                print(f"Extraction détails patch {item['id']}...")
+                print(f"Extraction of patch {item['id']}...")
                 full_patch = get_deep_patch_data(item['url'])
                 if not full_patch: continue
                 
-                
+                #commit message of the contributor
+                commit_message = full_patch.get('content', '')
+                if commit_message:
+                    commit_message = clean_comment(commit_message)
+
+                # Maintainers answers
                 c_res = requests.get(full_patch['comments'])
                 if c_res.status_code != 200: continue
                 comments = c_res.json()
                 
                 full_discussion = []
                 for comm in comments:
+                    # text of the maintainer's answer
                     content = comm['content']
                     cleaned = clean_comment(content)
                     
@@ -74,6 +84,7 @@ def harvest_deep_lessons(max_pages=1, patch_status="*", output_file=""):
                     lesson = {
                         "patch_id": full_patch['id'],
                         "subject": full_patch['name'],
+                        "commit_message": commit_message,
                         "diff": full_patch['diff'], 
                         "full_discussion": "\n\n".join(full_discussion), 
                         "date": full_patch['date'],
@@ -81,9 +92,9 @@ def harvest_deep_lessons(max_pages=1, patch_status="*", output_file=""):
                     }
                     f.write(json.dumps(lesson) + "\n")
                     f.flush() 
-                    print(f"  [DISQUE] Patch {item['id']} sauvegardé.")
+                    print(f"  Patch {item['id']} saved.")
                 
                 time.sleep(0.5) 
 
-harvest_deep_lessons(max_pages=20, patch_status=state_dict["rejected"], output_file=output_path)
-harvest_deep_lessons(max_pages=20, patch_status=state_dict["changes_requested"], output_file=output_path)
+harvest_deep_lessons(max_pages=35, patch_status=state_dict["rejected"], output_file=output_path)
+harvest_deep_lessons(max_pages=35, patch_status=state_dict["changes_requested"], output_file=output_path)
