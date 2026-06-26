@@ -1,15 +1,22 @@
-def search_history(embedder, es, patch_data):
+def search_history(embedder, es, patch_data, threshold=0.5):
     """Search the case history using the full context."""
-    package_name = patch_data["subject"].split(":")[0].split("]")[-1].strip()
     
     diff_lines = patch_data['diff'].split('\n')
-    added_content = [l[1:].strip() for l in diff_lines if l.startswith('+') and not l.startswith('+++')]
+    changes = [
+            l.strip() for l in diff_lines 
+            if (l.startswith('+') or l.startswith('-')) 
+            and not l.startswith('+++') 
+            and not l.startswith('---')
+        ]
 
-    # Create a rich query combining subject and diff
+    if not changes:
+        return []
+    
+    # Create a rich query combining commit message and diff
+    commit_intent = patch_data.get('full_discussion', patch_data.get('subject', ''))
     query_text = (
-        f"Package name: {package_name}\n"
-        f"Subject: {patch_data['subject']}\n"
-        f"Code Patterns: {' '.join(added_content[:20])}"
+            f"Code Error: {' '.join(changes)} "
+            f"Issue Context: {commit_intent}"
     )
 
     query_vector = embedder.encode(query_text).tolist()
@@ -18,12 +25,9 @@ def search_history(embedder, es, patch_data):
     knn_config = {
         "field": "text_vector",
         "query_vector": query_vector,
-        "k": 5,  # Increase to 5 to give Gemini more options
+        "k": 5,  # Include 5 patches to give more options
         "num_candidates": 100,
     }
-
-    # Attempt to extract the package name from the subject (e.g. [PATCH] zlib: ...)
-    
 
     response = es.search(
         index="buildroot-patches-history",
@@ -31,10 +35,19 @@ def search_history(embedder, es, patch_data):
         source=["technical_issue", "corrective_action", "status", "package", "code_pattern"],
     )
 
+    #similarity threshold to prevent non relevant patch submission
+    es_min_score = (1.0 + threshold) / 2.0
+
     context = []
     for hit in response["hits"]["hits"]:
+
+        es_score = hit["_score"]
+        if es_score < es_min_score:
+            continue
+
         src = hit["_source"]
         patch_id = src.get("patch_id", hit.get("_id", "unknown")).replace("patch_", "")
+        
         context.append(
             {
             "package": src.get("package"),
@@ -48,32 +61,36 @@ def search_history(embedder, es, patch_data):
     return context
 
 
-def search_manual(embedder, es, patch_data):
+def search_manual(es, relevant_chapters: list):
     """Search the manual based on intent and code."""
-    # Here, the full discussion is essential to understand what the developer is trying to do
-    query_text = f"{patch_data['subject']} {patch_data['full_discussion']}"
-    query_vector = embedder.encode(query_text).tolist()
 
-    knn_config = {
-        "field": "text_vector",
-        "query_vector": query_vector,
-        "k": 3,
-        "num_candidates": 50,
+    if not relevant_chapters:
+            return []
+    query = {
+        "query": {
+            "terms": {
+                "chapter_number": relevant_chapters
+            }
+        },
+        "size": 20 
     }
 
-    response = es.search(
-        index="buildroot-documentation",
-        knn=knn_config,
-        source=["rule_title", "raw_content", "url"],
-    )
+    try:
+        results = es.search(index="buildroot-documentation", body=query)
+        
+        manual_rules = []
+        for hit in results['hits']['hits']:
+            title = hit['_source']['rule_title']
+            content = hit['_source']['raw_content']
+            url = hit['_source']['url']
+            
+            manual_rules.append({
+                'url': url,
+                'content': f"Section title : {title}\n{content}"
+            })
+        
+        return manual_rules
 
-    rules = []
-    for hit in response["hits"]["hits"]:
-        rules.append(
-            {
-                "title": hit["_source"]["rule_title"],
-                "content": hit["_source"]["raw_content"],
-                "url": hit["_source"]["url"],
-            }
-        )
-    return rules
+    except Exception as e:
+        print(f"Error during manual retrieval : {e}")
+        return []

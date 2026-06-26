@@ -1,8 +1,12 @@
 import requests
 from bs4 import BeautifulSoup
-import json
+import pathlib
 
 def extract_buildroot_manual(url="https://buildroot.org/downloads/manual/manual.html"):
+    """
+    Download and keeps only the interesting sections of the Buildroot manual.
+    """
+        
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
     
@@ -63,8 +67,13 @@ def extract_buildroot_manual(url="https://buildroot.org/downloads/manual/manual.
             
     return extracted_rules
 
-rules = extract_buildroot_manual()
 
-f = open( 'buildroot_doc.html', 'w+' )
-f.write( 'rules = ' + repr(rules) + '\n' )
-f.close()
+parent_dir = pathlib.Path(__file__).parent.resolve()
+
+doc_path = parent_dir.parent / 'ressources' / 'The_Buildroot_user_manual.html'
+
+rules = extract_buildroot_manual()
+with open(doc_path, 'w+', encoding='utf-8') as f:
+    f.write('rules = ' + repr(rules) + '\n')
+    f.close()
+

@@ -1,0 +1,138 @@
+{
+    "16.1": {
+        "title": "Config.in file (coding style)",
+        "section_id": "writing-rules-config-in"
+    },
+    "16.2": {
+        "title": "The .mk file (coding style)",
+        "section_id": "writing-rules-mk"
+    },
+    "16.3": {
+        "title": "The genimage.cfg file",
+        "section_id": "writing-genimage-cfg"
+    },
+    "16.5": {
+        "title": "Support scripts (support/...)",
+        "section_id": "_support_scripts"
+    },
+    "17": {
+        "title": "Adding support for a particular board",
+        "section_id": "adding-board-support"
+    },
+    "18.1": {
+        "title": "Package directory",
+        "section_id": "_package_directory"
+    },
+    "18.2": {
+        "title": "Config files (global rules)",
+        "section_id": "_config_files"
+    },
+    "18.4": {
+        "title": "The .hash file (global rules)",
+        "section_id": "adding-packages-hash"
+    },
+    "18.6": {
+        "title": "Infrastructure for packages with specific build systems (.mk file rules)",
+        "section_id": "_infrastructure_for_packages_with_specific_build_systems"
+    },
+    "18.7": {
+        "title": "Infrastructure for autotools-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_autotools_based_packages"
+    },
+    "18.8": {
+        "title": "Infrastructure for CMake-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_cmake_based_packages"
+    },
+    "18.9": {
+        "title": "Infrastructure for Python packages (.mk file rules)",
+        "section_id": "_infrastructure_for_python_packages"
+    },
+    "18.10": {
+        "title": "Infrastructure for LuaRocks-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_luarocks_based_packages"
+    },
+    "18.11": {
+        "title": "Infrastructure for Perl/CPAN packages (.mk file rules)",
+        "section_id": "_infrastructure_for_perl_cpan_packages"
+    },
+    "18.12": {
+        "title": "Infrastructure for virtual packages (.mk file rules)",
+        "section_id": "_infrastructure_for_virtual_packages"
+    },
+    "18.13": {
+        "title": "Infrastructure for packages using kconfig for configuration files (.mk file rules)",
+        "section_id": "_infrastructure_for_packages_using_kconfig_for_configuration_files"
+    },
+    "18.14": {
+        "title": "Infrastructure for rebar-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_rebar_based_packages"
+    },
+    "18.15": {
+        "title": "Infrastructure for Waf-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_waf_based_packages"
+    },
+    "18.16": {
+        "title": "Infrastructure for Meson-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_meson_based_packages"
+    },
+    "18.17": {
+        "title": "Infrastructure for Cargo-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_cargo_based_packages"
+    },
+    "18.18": {
+        "title": "Infrastructure for Go packages (.mk file rules)",
+        "section_id": "_infrastructure_for_go_packages"
+    },
+    "18.19": {
+        "title": "Infrastructure for QMake-based packages (.mk file rules)",
+        "section_id": "_infrastructure_for_qmake_based_packages"
+    },
+    "18.20": {
+        "title": "Infrastructure for packages building kernel modules (.mk file rules)",
+        "section_id": "_infrastructure_for_packages_building_kernel_modules"
+    },
+    "18.21": {
+        "title": "Infrastructure for asciidoc documents (.mk file rules)",
+        "section_id": "_infrastructure_for_asciidoc_documents"
+    },
+    "18.22": {
+        "title": "Infrastructure specific to the Linux kernel package (.mk file rules)",
+        "section_id": "linux-kernel-specific-infra"
+    },
+    "18.23": {
+        "title": "Hooks available in the various build steps",
+        "section_id": "hooks"
+    },
+    "18.24": {
+        "title": "Gettext integration and interaction with packages (NLS)",
+        "section_id": "_gettext_integration_and_interaction_with_packages"
+    },
+    "18.25.4": {
+        "title": "How to add a package from GitHub",
+        "section_id": "github-download-url"
+    },
+    "18.25.5": {
+        "title": "How to add a package from GitLab",
+        "section_id": "gitlab-download-url"
+    },
+    "19.3": {
+        "title": "Format and licensing of the package patches",
+        "section_id": "_format_and_licensing_of_the_package_patches"
+    },
+    "19.4": {
+        "title": "Sending a fix to an issue of an upstream package (Additional patch documentation)",
+        "section_id": "additional-patch-documentation"
+    },
+    "22.5.1": {
+        "title": "The formatting of a patch",
+        "section_id": "_the_formatting_of_a_patch"
+    },
+    "22.5.5": {
+        "title": "Patch revision changelog (for patches that are not the first version of a fix)",
+        "section_id": "_patch_revision_changelog"
+    },
+    "23": {
+        "title": "DEVELOPERS file and get-developers",
+        "section_id": "DEVELOPERS"
+    }
+}

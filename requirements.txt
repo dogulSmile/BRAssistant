@@ -3,7 +3,7 @@ sentence-transformers
 huggingface_hub
 bs4
 python-dotenv
-openrouter
 asyncio
 aiohttp
 tenacity
+openai # or any other AI model : google-genai, openai, cohere ...

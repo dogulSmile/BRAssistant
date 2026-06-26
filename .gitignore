@@ -2,3 +2,4 @@ venv/
 .env
 output/
 __pycache__/
+reviews_eml/

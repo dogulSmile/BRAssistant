@@ -1,3 +1,4 @@
+import time
 import requests
 import re
 import os
@@ -25,7 +26,6 @@ def get_full_series_context(current_patch_id, series_id):
         if p_info['id'] == current_patch_id:
             break  # Stop before the current patch
         
-        # Use your existing function
         prev_patch_data = get_patch_from_patchwork(p_info['web_url'])
         if prev_patch_data:
             full_context += f"Subject: {prev_patch_data['subject']}:\n"
@@ -37,6 +37,7 @@ def get_full_series_context(current_patch_id, series_id):
     return full_context
 
 def get_patch_from_patchwork(patch_url_or_id):
+    """Retrieve all the info from the current patch, commit message inclued."""
     identifier = str(patch_url_or_id).strip('/')
     
     # 1. Extract the identifier from the URL
@@ -45,7 +46,7 @@ def get_patch_from_patchwork(patch_url_or_id):
         if match:
             identifier = match.group(1)
         else:
-            raise ValueError(f"URL non reconnue : {patch_url_or_id}")
+            raise ValueError(f"URL unknown : {patch_url_or_id}")
 
     # 2. Resolve the actual numeric ID
     target_id = None
@@ -54,16 +55,24 @@ def get_patch_from_patchwork(patch_url_or_id):
     else:
         # Search by Message-ID to find the numeric ID
         search_url = f"https://patchwork.ozlabs.org/api/1.2/patches/?msgid={identifier}"
-        try:
-            res = requests.get(search_url, timeout=15)
-            search_data = res.json()
-            if isinstance(search_data, list) and len(search_data) > 0:
-                target_id = search_data[0]['id']
-            else:
-                print(f"'Aucun patch trouvé pour le Message-ID : {identifier}")
-                return None
-        except Exception as e:
-            print(f"'Erreur lors de la recherche du Message-ID : {e}")
+        for attempt in range(3):
+            try:
+                res = requests.get(search_url, timeout=15)
+                res.raise_for_status()
+                search_data = res.json()
+                break
+
+            except Exception as e:
+                if attempt < 2:
+                    time.sleep(2)
+                else:
+                    print(f"Error during search of Message ID : {e}")
+                    return None
+        
+        if isinstance(search_data, list) and len(search_data) > 0:
+            target_id = search_data[0]['id']
+        else:
+            print(f"No patch found for Message-ID : {identifier}")
             return None
 
     # 3. Retrieve detailed data (required for the diff)
@@ -76,11 +85,11 @@ def get_patch_from_patchwork(patch_url_or_id):
         response.raise_for_status()
         patch_json = response.json()
 
-        # 4. Retrieve comments
+        # 4. Retrieve potential answers of maintainers
         r_comments = requests.get(f"{api_detail_url}comments/")
         comments_json = r_comments.json() if r_comments.status_code == 200 else []
 
-        # 5. Format the result for the agent
+        # 5. Format the result for the agent : contributor's commit message + potential answers
         full_discussion = f"INITIAL DESCRIPTION:\n{patch_json.get('content', '')}\n\n"
         if comments_json:
             full_discussion += "MAILING LIST DISCUSSION:\n"
@@ -91,12 +100,13 @@ def get_patch_from_patchwork(patch_url_or_id):
         # Check if the diff is present this time
         diff_content = patch_json.get('diff')
         if not diff_content:
-            print(f"Attention: Le diff est toujours absent pour le patch {target_id}")
+            print(f"Warning : no diff found in {target_id}")
 
         return {
             "id": target_id,
             "name": patch_json.get('name'),
             "subject": patch_json.get('name'),
+            "msgid": patch_json.get('msgid'),
             "diff": diff_content,
             "status": patch_json.get('state'),
             "submitter": {
@@ -109,7 +119,7 @@ def get_patch_from_patchwork(patch_url_or_id):
         }
 
     except Exception as e:
-        print(f"'Erreur Patchwork lors de la récupération des détails ({target_id}): {e}")
+        print(f"Patchwork error while retrieving details on patch ({target_id}): {e}")
         return None
 
 
@@ -119,7 +129,7 @@ def get_patch_from_file(file_path):
     Simulate the Patchwork API structure for compatibility with the agent.
     """
     if not os.path.isfile(file_path):
-        print(f"'Fichier introuvable : {file_path}")
+        print(f"'Can't find file : {file_path}")
         return None
 
     try:
@@ -150,10 +160,15 @@ def get_patch_from_file(file_path):
         diff_match = re.search(r'(diff --git.*)', content, re.DOTALL)
         diff_content = diff_match.group(1) if diff_match else ""
 
+        #message id to reply to it
+        msgid_match = re.search(r'^Message-Id:\s*(<.*?>)', content, re.MULTILINE | re.IGNORECASE)
+        msgid = msgid_match.group(1) if msgid_match else None
+
         return {
             "id": patch_id,
             "name": subject,
             "subject": subject,
+            "msgid": msgid,
             "diff": diff_content,
             "status": "local",
             "submitter": {
@@ -163,6 +178,7 @@ def get_patch_from_file(file_path):
             "full_discussion": description,
             "patch_url": f"https://patchwork.ozlabs.org/patch/{patch_id}/"
         }
+    
     except Exception as e:
-        print(f"'Erreur lors de la lecture du fichier patch : {e}")
+        print(f"'Error while reading patch file : {e}")
         return None
