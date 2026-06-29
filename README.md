@@ -4,7 +4,7 @@ An AI-powered automated code review assistant designed specifically for the **Bu
 
 
 
-## Key Features
+## 1. Key Features
 
 * **Dual-Engine RAG**: Performs semantic kNN vector searches over both the official Buildroot User Manual and a curated history of past patch rejections.
 * **Code-Signature Alignment**: Employs a unified embedding strategy to match raw patch diff patterns directly with natural language developer logs.
@@ -14,7 +14,7 @@ An AI-powered automated code review assistant designed specifically for the **Bu
 
 
 
-## Prerequisites
+## 2. Prerequisites
 
 Ensure your host machine has the following prerequisites installed:
 * **Python 3.10** or higher
@@ -23,7 +23,7 @@ Ensure your host machine has the following prerequisites installed:
 
 
 
-## Technical Stack & Dependencies
+## 3. Technical Stack & Dependencies
 
 The project relies on the core dependencies specified in `requirements.txt`:
 
@@ -40,7 +40,7 @@ The project relies on the core dependencies specified in `requirements.txt`:
 
 
 
-## Infrastructure Setup
+## 4. Infrastructure Setup
 
 The processing pipeline requires an active Elasticsearch 8.x instance to store embeddings.
 
@@ -87,7 +87,7 @@ curl -s "http://localhost:9200/_cat/allocation?v"
 ```
 
 
-## Installation & Setup
+## 5. Installation & Setup
 
 1. **Clone the repository:**
    ```bash
@@ -108,13 +108,19 @@ curl -s "http://localhost:9200/_cat/allocation?v"
    ```
 
 4. **Environment Variables (.env file) :**
-   Fristly provide the mail adress you will use for reviews:
 
-   Get your keys here (no specific permissions required) :
-      https://huggingface.co/settings/tokens
-      https://openrouter.ai/workspaces/default/keys (if using openrouter)
+   Fristly provide the mail adress you will use for reviews:
+      ```env
+      MAIL_ADRESS="vacation@gmail.com"
+      ```
+
+   Then get your keys here (no specific permissions required) :
+
+      https://huggingface.co/settings/tokens (`HF_API_KEY` required if you want to vectorize new data)
+
+      https://openrouter.ai/workspaces/default/keys (if using openrouter for patch reviews)
       
-   and create/modify a `.env` file in the root directory to store your API keys and configurations, here is an example to test multiple AI models:
+   You will then create/modify a `.env` file in the root directory to store your API keys and configurations, here is an example configuration with multiple AI models ready to be tested :
 
    ```env
       MAIL_ADRESS="vacation@gmail.com"
@@ -136,6 +142,13 @@ curl -s "http://localhost:9200/_cat/allocation?v"
       COHERE_API_KEY=""
    ```
 
+   As you can see, you can setup different keys/model in the `.env` file, but you will have to choose which one to use for 
+
+   - **vectorizing** : the only provider supported at the moment is Hugging Face. just put your key in `HF_API_KEY` if you want to add new data to the RAG database.
+   - **routing** :  currently the suppported models for routing are gemini, gemini_lite, github_models and cohere. Choose the provider (with the help of section "8. How to choose the AI Model"), and write it in the `ROUTER_AI_PROVIDER` variable. If you want to modify the specific model used for the routing agent, you will have to modify ai_agents/router.py
+   - **patch review** : same principle, but you can choose which model to use by modifying `<PROVIDER>_MODEL_ID` in the `.env`, and write the coresponding provider in `REVIEW_AI_PROVIDER` (available ones : openrouter, gemini, github_models, cohere).
+
+
 4. **Environment Variables:**
 
    Launch those 2 commands at the root of the project to initialize the database (Elasticsearch must be started):
@@ -148,7 +161,7 @@ curl -s "http://localhost:9200/_cat/allocation?v"
 
 
 
-## Usage
+## 6. Usage
 
 To launch the agent, please verify that your venv is activated, then in the root of the project simply launch this command :
 
@@ -162,8 +175,9 @@ You will be asked to put the patch to review, you have 2 possible choices:
 You can also directly indicate the patch to analyze this way:
 
 ```bash
-
+python3 ./BRAssistant.py <patchwork_url_of_the_contribution>
 ```
+
 After the analyze, you will find your review ready in .eml format in the reviews_eml/ directory, you can open it with your favorite mail software and edit it (using Thunderbird, you will do right-clic, then 'Edit as new message')
 Depending of your mail app, some of them are not compatible with "In-Reply-To" header, in this case you might directly reply to the original mail to keep the thread.
 
@@ -182,7 +196,7 @@ If you find the answer correct, just press 'enter' to continue.
 
 To analyze another patch, you can simply enter again another url/path of a patch, and another .eml file will be created.
 
-## Data update
+## 7. Data update
 
 To update the database of the RAG, there is multiple functions to retrieve and format the patches and the documentation.
 
@@ -213,7 +227,7 @@ python3 ./data_construction/patch_formatter.py <input_file_path> <output_file_pa
 
 Reminder: to push new patches to the database, use `python3 elastic_functions/vectorializer.py -p ressources/buildroot_lessons.jsonl`
 
-## How to choose the AI Model
+## 8. How to choose the AI Model
 
 Currently, there are a few different models supported, and your choice will produce varied results.
 There are two types of models here: **"Reasoning"** models and **"Routing"** (Lite) models.
